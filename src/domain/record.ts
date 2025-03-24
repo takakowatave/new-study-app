@@ -4,19 +4,20 @@ export class Record {
     constructor(
       public id: string,            // 一意なID
       public title: string,         // Recordの内容
-      public done: boolean,         // 完了したかどうか
+      public time: string,         // 学習時間
       public created_at: string     // 作成日時（YYYY/MM/DD形式になる）
     ) {}
-  
+
+    
     // 静的メソッド：新しいRecordを作るときに使う補助関数
     public static newRecord(
       id: string,
       title: string,
-      done: boolean,
+      time: string,
       created_at: string
     ): Record {
       // created_atの日付を整形してからインスタンスを返す
-      return new Record(id, title, done, formatDate(created_at));
+      return new Record(id, title, time, formatDate(created_at));
     }
   }
   
