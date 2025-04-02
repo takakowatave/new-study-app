@@ -1,57 +1,91 @@
-import { Record } from "./domain/record";
+import { StudyRecord, NewRecord } from "./domain/studyRecord";
 import { Button, Box, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import { supabase } from "./utils/supabase";
 
 const App = () => {
-  const [record, setRecord] = useState<Record[]>([]);
+  const [records, setRecords] = useState<StudyRecord[]>([]);
   const [time, setTime] = useState('');
   const [text, setText] = useState('');
-  const [createdAt, setcreatedAt] = useState('');
-  const [loeading, setLoeading] = useState([]);
-  const [errorMessage, setErrorMessage] = useState([]);
+  const [createdAt, setCreatedAt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleAdd = async () => {
-  //errorの処理
-    const message ="";
-    if (text.trim()==="")  {
-      message = "学習内容を入力してください";
-    }
-    if (message)  {
-      setErrorMessage(message);
-      return;
-    }
-  //インスタンスの初期化
-  const newRecord = new Record(
-    text,
-    time,
-    createdAt
-  );
-  
-  console.log("newRecord の中身:", newRecord);
-  //supabaseの処理
-  const { data, error } = await supabase.from("study-record").insert([newRecord]);
+
+  const fetchRecords = async () => { // 非同期関数を定義
+    setLoading(true); // ローディング
+    const { data, error } = await supabase.from("study-record").select("*"); // Supabaseからデータを参照する定義
     if (error) {
-      setErrorMessage(message);
+      setErrorMessage(error.message); // エラーだったらメッセージ出す
       return;
     }
-    setRecord([...record, newRecord]);
+    setRecords(data);
+    setLoading(false); // ローディングじゃない時
   };
+  
+  const handleAdd = async () => {
+    //errorの処理
+    setLoading(true);
+    if (text.trim()==="")  {
+      setErrorMessage("学習内容を入力してください");
+      return;  
+    }
+    //newRecord(型)をオブジェクトとして定義
+    const newRecord: NewRecord = {
+      title: text,
+      time: Number(time),
+      created_at: new Date(createdAt).toISOString(),
+    };
+    console.log("送信データ", newRecord);
+    //supabaseの処理
+    try {
+    const { data, error } = await supabase
+      .from("study-record")
+      .insert([newRecord])
+      .select();
+      if (!data) {
+        throw new Error("サーバーでエラーが発生しました");
+      }
+    //studyRecord クラスを使いそのコンストラクタに data[0] を渡すことでインスタンス化する
+    const inserted = StudyRecord.newRecord(
+      data[0].id,
+      data[0].title,
+      data[0].time,
+      data[0].created_at
+    ); 
+    await fetchRecords();
+    setText('')
+    setTime('')
+    setCreatedAt('')
+    }
+    catch (error) {
+      console.error("Supabaseエラー:", error.message);
+      setErrorMessage("データの保存に失敗しました: " + error.message);
+      return;
+    }
+    finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
 
   return (
   <Box w="100%" h="100%" p="8">
     <Flex justify="center" align="center">
       <Heading as="h1">学習アプリ</Heading>
   </Flex>
-    <Box  gap={4} display="flex" justifyContent="center" alignItems="center" h="500px" p="8">
+    <Box gap={4} display="flex" justifyContent="center" alignItems="center" h="500px" p="8">
       <Box w="400px" h="full" bg='gray.100' p="8">
         <form>
           日時
           <Input  my="2" bg='white'
-            type="time"
+            type="datetime-local"
             value={createdAt}
-            onChange={(e) => setcreatedAt(e.target.value)}
+            onChange={(e) => setCreatedAt(e.target.value)}
           />
         </form>
         <form>
@@ -85,7 +119,7 @@ const App = () => {
           </Tr>
         </Thead>
         <Tbody>
-          {record.map((r) => (
+          {records.map((r) => (
           <Tr key={r.id}>
             <Td>{r.created_at}</Td>
             <Td>{r.title}</Td>
