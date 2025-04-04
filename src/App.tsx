@@ -1,28 +1,30 @@
 import { StudyRecord, NewRecord } from "./domain/studyRecord";
-import { Button, Box, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td,  Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
+import { Button, Box, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import { supabase } from "./utils/supabase";
 import { useDisclosure } from '@chakra-ui/react';
 import { useForm } from "react-hook-form";
 
+//Dataの型定義
+type FormValues = {
+  text: string
+  time: number
+  created_at: string
+};
 
 const App = () => {
   const [records, setRecords] = useState<StudyRecord[]>([]);
-  const [time, setTime] = useState('');
-  const [text, setText] = useState('');
-  const [createdAt, setCreatedAt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { register, handleSubmit, formState: { errors } } = useForm();
+  const [loading, setLoading] = useState(false);
 
 
   const fetchRecords = async () => { // 非同期関数を定義
     setLoading(true); // ローディング
     const { data, error } = await supabase.from("study-record").select("*"); // Supabaseからデータを参照する定義
     if (error) {
-      setErrorMessage(error.message); // エラーだったらメッセージ出す
+      console.error("データ取得エラー:", error); // エラーだったらメッセージ出す
       return;
     }
     setRecords(data.map(d =>
@@ -31,18 +33,19 @@ const App = () => {
     setLoading(false); // ローディングじゃない時
   };
   
-  const handleAdd = async () => {
+  const handleAdd = async (data: FormValues) => {
+    console.log("送信されたフォームの値:", data);
     //errorの処理
     setLoading(true);
-    if (text.trim()==="")  {
-      setErrorMessage("学習内容を入力してください");
+    if (data.text.trim()==="")  {
+      console.error("学習内容を入力してください", error);
       return;  
     };
     //newRecord(型)をオブジェクトとして定義
     const newRecord: NewRecord = {
-      title: text,
-      time: Number(time),
-      created_at: new Date(createdAt).toISOString(),
+      title: data.text,
+      time: Number(data.time),
+      created_at: new Date(data.created_at).toISOString(),
     };
     console.log("送信データ", newRecord);
     //supabaseの処理
@@ -62,13 +65,10 @@ const App = () => {
       data[0].created_at
     ); 
     await fetchRecords();
-    setText('')
-    setTime('')
-    setCreatedAt('')
+      reset()
     }
     catch (error) {
       console.error("Supabaseエラー:", error.message);
-      setErrorMessage("データの保存に失敗しました: " + error.message);
       return;
     }
     finally {
@@ -79,6 +79,10 @@ const App = () => {
   useEffect(() => {
     fetchRecords();
   }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
+
+  if (loading) {
+    return <p>Loading...</p>;
+  }
 
   return (
   <Box w="100%" h="100%" p="8">
@@ -98,12 +102,9 @@ const App = () => {
             日時
             <Input  my="2" bg='white'
               type="datetime-local"
-              value={createdAt}
               {...register("created_at", { required: "日時の入力は必須です" })}
-              onChange={(e) => setCreatedAt(e.target.value)}
             />
             {errors.createdAt && <Box color="red.500">{errors.createdAt.message}</Box>}
-
             内容
             <Input  my="2" bg='white'
               type="text"
@@ -113,12 +114,10 @@ const App = () => {
             時間
             <Input  my="2" bg='white'
               type="number"
-              value={time}
               {...register("time", {
                 required: "時間の入力は必須です",
                 min: { value: 1, message: "時間は0以上である必要があります"}
               })}
-              onChange={(e) => setTime(e.target.value)}
             />
             {errors.time && <Box color="red.500">{errors.time.message}</Box>}
             <Button type="submit" colorScheme="teal" w="full" mt="8">保存</Button>
