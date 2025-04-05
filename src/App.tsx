@@ -1,10 +1,12 @@
 import { StudyRecord, NewRecord } from "./domain/studyRecord";
-import { Button, Box, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
+import { Button, Box, NumberInputField, NumberInput, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import { supabase } from "./utils/supabase";
-import { useDisclosure } from '@chakra-ui/react';
-import { useForm } from "react-hook-form";
+import { useDisclosure, useToast } from '@chakra-ui/react';
+import { useForm,Controller } from "react-hook-form";
+import { CloseIcon } from '@chakra-ui/icons'
+
 
 //Dataの型定義
 type FormValues = {
@@ -16,9 +18,14 @@ type FormValues = {
 const App = () => {
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, control, formState: { errors }, reset } = useForm<FormValues>();
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
+  const handleClose = () => {
+    reset();       // フォーム内容・エラーの初期化
+    onClose();     // モーダルを閉じる
+  };
 
   const fetchRecords = async () => { // 非同期関数を定義
     setLoading(true); // ローディング
@@ -37,10 +44,6 @@ const App = () => {
     console.log("送信されたフォームの値:", data);
     //errorの処理
     setLoading(true);
-    if (data.text.trim()==="")  {
-      console.error("学習内容を入力してください", error);
-      return;  
-    };
     //newRecord(型)をオブジェクトとして定義
     const newRecord: NewRecord = {
       title: data.text,
@@ -66,6 +69,14 @@ const App = () => {
     ); 
     await fetchRecords();
       reset()
+      onClose();
+      toast({
+        title: "追加しました",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
     }
     catch (error) {
       console.error("Supabaseエラー:", error.message);
@@ -81,30 +92,30 @@ const App = () => {
   }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p>Loading...</p></Box>;
   }
 
   return (
-  <Box w="100%" h="100%" p="8">
-    <Flex justify="center" align="center">
+  <Box w="100%" alignItems="center" h="100vh" p="8">
+    <Flex justify="center">
       <Heading as="h1">学習アプリ</Heading>
       <Button onClick={onOpen}>登録</Button>
     </Flex>
-    <Modal isOpen={isOpen} onClose={onClose}>
+    <Modal isOpen={isOpen} onClose={handleClose}>
     <ModalOverlay />
     <ModalContent>
       <ModalHeader>登録確認</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
-        <Box gap={4} display="flex" justifyContent="center" alignItems="center" h="500px" p="8">
-        <Box w="400px" h="full" bg='gray.100' p="8">
+        <Box gap={4} justifyContent="center" p="4">
+        <Box w="100%">
           <form onSubmit={handleSubmit(handleAdd)}>
             日時
             <Input  my="2" bg='white'
               type="datetime-local"
               {...register("created_at", { required: "日時の入力は必須です" })}
             />
-            {errors.createdAt && <Box color="red.500">{errors.createdAt.message}</Box>}
+            {errors.created_at && <Box color="red.500">{errors.created_at.message}</Box>}
             内容
             <Input  my="2" bg='white'
               type="text"
@@ -112,12 +123,18 @@ const App = () => {
             />
             {errors.text && <Box color="red.500">{errors.text.message}</Box>}
             時間
-            <Input  my="2" bg='white'
-              type="number"
-              {...register("time", {
+            <Controller
+              name="time"
+              control={control}
+              rules={{
                 required: "時間の入力は必須です",
-                min: { value: 1, message: "時間は0以上である必要があります"}
-              })}
+                min: { value: 1, message: "時間は1以上である必要があります" },
+              }}              
+              render={({ field }) => (
+                <NumberInput {...field}>
+                  <NumberInputField bg="white" my="2"/>
+                </NumberInput>
+              )}
             />
             {errors.time && <Box color="red.500">{errors.time.message}</Box>}
             <Button type="submit" colorScheme="teal" w="full" mt="8">保存</Button>
@@ -126,18 +143,16 @@ const App = () => {
         </Box>
         </Box>
       </ModalBody>
-      <ModalFooter>
-        <Button onClick={onClose}>閉じる</Button>
-      </ModalFooter>
     </ModalContent>
   </Modal>
-  <Box w="400px" p="8"  h="full" justifyContent="center" alignItems="center">
+  <Box display="flex"  mx="auto" w="60%" p="8" justifyContent="center">
           <Table variant="simple">
           <Thead>
             <Tr>
               <Th>日時</Th>
               <Th>内容</Th>
               <Th>時間</Th>
+              <Th>編集</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -146,6 +161,14 @@ const App = () => {
               <Td>{r.created_at}</Td>
               <Td>{r.title}</Td>
               <Td>{r.time}</Td>
+              <Td>
+                <Button 
+                    size="sm" 
+                    colorScheme="red" 
+                    onClick= {() => handleDelete(r.id)}>
+                      {<CloseIcon />}
+                </Button> 
+              </Td>
             </Tr>
             ))}
           </Tbody>
