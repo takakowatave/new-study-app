@@ -1,5 +1,5 @@
 import { StudyRecord, NewRecord } from "./domain/studyRecord";
-import { Button, Box, NumberInputField, NumberInput, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
+import { Button, Box, NumberInputField, NumberInput, NumberDecrementStepper, NumberIncrementStepper, NumberInputStepper, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import { supabase } from "./utils/supabase";
@@ -87,6 +87,15 @@ const App = () => {
     }
   };
 
+  const handleDelete = async (record: StudyRecord) => {
+    const { error } = await supabase.from("study-record").delete().eq("id", record.id);
+    if (error) {
+      console.error("Supabaseエラー:", error.message);
+      return;
+    }
+    await fetchRecords();
+  };
+
   useEffect(() => {
     fetchRecords();
   }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
@@ -96,10 +105,10 @@ const App = () => {
   }
 
   return (
-  <Box w="100%" alignItems="center" h="100vh" p="8">
-    <Flex justify="center">
+  <Box mx="auto" flexDirection="column" display="flex" w="600px" alignItems="center" h="100vh" p="8">
+    <Flex alignItems="center" justifyContent="space-between" w="100%">
       <Heading as="h1">学習アプリ</Heading>
-      <Button onClick={onOpen}>登録</Button>
+      <Button  colorScheme="teal" onClick={onOpen}>登録</Button>
     </Flex>
     <Modal isOpen={isOpen} onClose={handleClose}>
     <ModalOverlay />
@@ -131,13 +140,21 @@ const App = () => {
                 min: { value: 1, message: "時間は1以上である必要があります" },
               }}              
               render={({ field }) => (
-                <NumberInput {...field}>
-                  <NumberInputField bg="white" my="2"/>
+                <NumberInput
+                  value={field.value} //値を反映
+                  onChange={(valueString) => field.onChange(Number(valueString))} //型を合わせる
+                  min={1}
+                  >
+                  <NumberInputField bg="white" my="1"/>
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
                 </NumberInput>
               )}
             />
             {errors.time && <Box color="red.500">{errors.time.message}</Box>}
-            <Button type="submit" colorScheme="teal" w="full" mt="8">保存</Button>
+            <Button type="submit" colorScheme="teal" w="100%" my="4">保存</Button>
           </form>
 
         </Box>
@@ -145,7 +162,7 @@ const App = () => {
       </ModalBody>
     </ModalContent>
   </Modal>
-  <Box display="flex"  mx="auto" w="60%" p="8" justifyContent="center">
+  <Box display="flex"  mx="auto" w="100%" my="8" justifyContent="center">
           <Table variant="simple">
           <Thead>
             <Tr>
@@ -156,16 +173,17 @@ const App = () => {
             </Tr>
           </Thead>
           <Tbody>
-            {records.map((r) => (
-            <Tr key={r.id}>
-              <Td>{r.created_at}</Td>
-              <Td>{r.title}</Td>
-              <Td>{r.time}</Td>
+            {records.map((record: StudyRecord) => (
+            <Tr key={record.id}>
+              <Td>{record.created_at}</Td>
+              <Td>{record.title}</Td>
+              <Td>{record.time}</Td>
               <Td>
                 <Button 
                     size="sm" 
-                    colorScheme="red" 
-                    onClick= {() => handleDelete(r.id)}>
+                    bg="red.50"
+                    color="red.500" 
+                    onClick= {() => handleDelete(record)}>
                       {<CloseIcon />}
                 </Button> 
               </Td>
@@ -174,8 +192,7 @@ const App = () => {
           </Tbody>
         </Table>
         </Box>
-  </Box>
-  
+  </Box> 
   );
 };
 
