@@ -1,12 +1,12 @@
 import { StudyRecord, NewRecord } from "./domain/studyRecord";
 import { Button, Box, NumberInputField, NumberInput, NumberDecrementStepper, NumberIncrementStepper, NumberInputStepper, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody,ModalFooter } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
-import React from 'react';
-import { supabase } from "./utils/supabase";
 import { useDisclosure, useToast } from '@chakra-ui/react';
 import { useForm,Controller } from "react-hook-form";
 import { CloseIcon } from '@chakra-ui/icons'
-
+import { fetchRecord } from "./lib/fetchRecords";
+import { insertRecord } from "./lib/insertRecords";
+import { deleteRecord } from "./lib/deleteRecords";
 
 //Dataの型定義
 type FormValues = {
@@ -27,17 +27,25 @@ const App = () => {
     onClose();     // モーダルを閉じる
   };
 
-  const fetchRecords = async () => { // 非同期関数を定義
+  const loadRecords = async () => { // 非同期関数を定義
     setLoading(true); // ローディング
-    const { data, error } = await supabase.from("study-record").select("*"); // Supabaseからデータを参照する定義
-    if (error) {
-      console.error("データ取得エラー:", error); // エラーだったらメッセージ出す
-      return;
-    }
+    try {
+      const { data, error } = await fetchRecord();
+      if (error || !data) {
+        throw new Error("データ取得に失敗しました");
+      }
     setRecords(data.map(d =>
-      StudyRecord.newRecord(d.id, d.title, d.time, d.created_at) //4つの引数（id, title, time, created_at）が必要
-    ));
-    setLoading(false); // ローディングじゃない時
+      StudyRecord.newRecord(d.id, d.title, d.time, d.created_at)) //4つの引数（id, title, time, created_at）が必要
+    );
+      } catch (err) {
+        if (err instanceof Error) {
+          console.error(err.message);
+        } else {
+          console.error("予期しないエラーが発生しました");
+        }
+      } finally {
+        setLoading(false); 
+      }
   };
   
   const handleAdd = async (data: FormValues) => {
@@ -53,10 +61,7 @@ const App = () => {
     console.log("送信データ", newRecord);
     //supabaseの処理
     try {
-    const { data, error } = await supabase
-      .from("study-record")
-      .insert([newRecord])
-      .select();
+    const { data, error } = await insertRecord(newRecord);
       if (!data) {
         throw new Error("サーバーでエラーが発生しました");
       }
@@ -67,7 +72,7 @@ const App = () => {
       data[0].time,
       data[0].created_at
     ); 
-    await fetchRecords();
+    await loadRecords();
       reset()
       onClose();
       toast({
@@ -88,18 +93,17 @@ const App = () => {
   };
 
   const handleDelete = async (record: StudyRecord) => {
-    const { error } = await supabase.from("study-record").delete().eq("id", record.id);
+    const { error } = await deleteRecord(record.id);
     if (error) {
       console.error("Supabaseエラー:", error.message);
       return;
     }
-    await fetchRecords();
+    await loadRecords();
   };
 
   useEffect(() => {
-    fetchRecords();
+    loadRecords();
   }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
-
   if (loading) {
     return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p>Loading...</p></Box>;
   }
@@ -107,7 +111,7 @@ const App = () => {
   return (
   <Box mx="auto" flexDirection="column" display="flex" w="600px" alignItems="center" h="100vh" p="8">
     <Flex alignItems="center" justifyContent="space-between" w="100%">
-      <Heading as="h1">学習アプリ</Heading>
+      <Heading as="h1" data-testid="title">学習アプリ</Heading>
       <Button  colorScheme="teal" onClick={onOpen}>登録</Button>
     </Flex>
     <Modal isOpen={isOpen} onClose={handleClose}>
@@ -163,7 +167,7 @@ const App = () => {
     </ModalContent>
   </Modal>
   <Box display="flex"  mx="auto" w="100%" my="8" justifyContent="center">
-          <Table variant="simple">
+          <Table variant="simple" data-testid="table">
           <Thead>
             <Tr>
               <Th>日時</Th>
@@ -197,3 +201,4 @@ const App = () => {
 };
 
 export default App;
+
