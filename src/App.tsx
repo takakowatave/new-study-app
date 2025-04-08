@@ -105,14 +105,14 @@ const App = () => {
     loadRecords();
   }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
   if (loading) {
-    return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p>Loading...</p></Box>;
+    return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p data-testid="loading">Loading...</p></Box>;
   }
 
   return (
   <Box mx="auto" flexDirection="column" display="flex" w="600px" alignItems="center" h="100vh" p="8">
     <Flex alignItems="center" justifyContent="space-between" w="100%">
       <Heading as="h1" data-testid="title">学習アプリ</Heading>
-      <Button  colorScheme="teal" onClick={onOpen}>登録</Button>
+      <Button  data-testid="add_button" colorScheme="teal" onClick={onOpen}>登録</Button>
     </Flex>
     <Modal isOpen={isOpen} onClose={handleClose}>
     <ModalOverlay />
