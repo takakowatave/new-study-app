@@ -1,6 +1,6 @@
 import { StudyRecord, NewRecord } from "./domain/studyRecord";
 import { Button, Box, NumberInputField, NumberInput, NumberDecrementStepper, NumberIncrementStepper, NumberInputStepper, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDisclosure, useToast } from '@chakra-ui/react';
 import { useForm,Controller } from "react-hook-form";
 import { MdEdit } from "react-icons/md";
@@ -8,9 +8,10 @@ import { MdDelete } from "react-icons/md";
 import { fetchRecord } from "./lib/fetchRecords";
 import { insertRecord } from "./lib/insertRecords";
 import { deleteRecord } from "./lib/deleteRecords";
+import { updateRecord } from "./lib/updateRecords";
 
 //Dataの型定義
-type FormValues = {
+export type FormValues = {
   text: string
   time: number
   created_at: string
@@ -18,7 +19,7 @@ type FormValues = {
 
 const App = () => {
   const [records, setRecords] = useState<StudyRecord[]>([]);
-  // const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { register, handleSubmit, control, formState: { errors }, reset } = useForm<FormValues>();
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,16 @@ const App = () => {
     onClose();     // モーダルを閉じる
   };
 
-  const loadRecords = async () => { // 非同期関数を定義
+  const onSubmit = async (data: FormValues) => {
+  if (editingRecord) {
+    await updateRecord(editingRecord.id, data);
+    // 成功時：reset(), onClose(), toast など
+  } else {
+    await handleAdd(data); // 新規登録時はそのまま使う
+  }
+};
+
+  const loadRecords = useCallback(async () => { // 非同期関数を定義
     setLoading(true); // ローディング
     try {
       const { error, data } = await fetchRecord();
@@ -65,7 +75,7 @@ const App = () => {
       } finally {
         setLoading(false); 
       }
-  };
+  }, [onClose, reset, toast]);
 
   const handleAdd = async (data: FormValues) => {
     console.log("送信されたフォームの値:", data);
@@ -143,10 +153,22 @@ const App = () => {
 
   useEffect(() => {
     loadRecords();
-  }, []); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
+  }, [loadRecords]); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
+
+  useEffect(() => { //編集ボタン押下後、フォームに初期値をセットする
+  if (editingRecord) {
+    reset({
+      created_at: editingRecord.created_at,
+      text: editingRecord.title,
+      time: editingRecord.time,
+    });
+  }
+}, [editingRecord, reset]);
+
   if (loading) {
     return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p data-testid="loading">Loading...</p></Box>;
   }
+
 
   return (
   <Box mx="auto" flexDirection="column" display="flex" w="600px" alignItems="center" h="100vh" p="8">
@@ -162,7 +184,7 @@ const App = () => {
       <ModalBody>
         <Box gap={4} justifyContent="center" p="4">
         <Box w="100%">
-          <form onSubmit={handleSubmit(handleAdd)}>
+          <form onSubmit={handleSubmit(onSubmit)}>
             日時
             <Input my="2" bg='white'
               type="datetime-local"
@@ -230,11 +252,11 @@ const App = () => {
                     onClick= {() => handleDelete(record)}>
                       <MdDelete />
                 </Button>
-                <Button data-testid={`delete_button_${record.id}`} //テスト側から個別の削除ボタンを正確に指定できるように
+                <Button data-testid={`editing_button_${record.id}`} //テスト側から個別の削除ボタンを正確に指定できるように
                     size="sm" 
                     bg="white"
                     color=" gray.500" 
-                    onClick= {() => handleDelete(record)}>
+                    onClick= {() => { setEditingRecord(record); onOpen(); }}>
                       <MdEdit />
                 </Button> 
               </Td>
