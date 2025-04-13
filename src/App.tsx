@@ -1,4 +1,4 @@
-import { StudyRecord, NewRecord } from "./domain/studyRecord";
+import { StudyRecord, NewRecord, formatDateForInput } from "./domain/studyRecord";
 import { Button, Box, NumberInputField, NumberInput, NumberDecrementStepper, NumberIncrementStepper, NumberInputStepper, Input, Heading, Flex, Table, Thead, Tbody,Tr,Th,Td, Modal,ModalOverlay,ModalContent, ModalHeader, ModalCloseButton,ModalBody } from '@chakra-ui/react';
 import { useState, useEffect, useCallback } from 'react';
 import { useDisclosure, useToast } from '@chakra-ui/react';
@@ -25,149 +25,169 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
-  const handleClose = () => {
-    reset();       // フォーム内容・エラーの初期化
-    onClose();     // モーダルを閉じる
-  };
-
-  const onSubmit = async (data: FormValues) => {
-  if (editingRecord) {
-    await updateRecord(editingRecord.id, data);
-    // 成功時：reset(), onClose(), toast など
-  } else {
-    await handleAdd(data); // 新規登録時はそのまま使う
-  }
+const getModalTitle = () => {
+  return editingRecord ? "記録編集" : "新規登録"; //editingRecord が存在すれば記録編集、存在しなければ新規登録を返す
+};
+  
+const handleClose = () => {
+  setEditingRecord(null); 
+  reset({
+    text: "",
+    time: 0,
+    created_at: formatDateForInput(new Date().toString())
+  });       
+  onClose();
+  return;
 };
 
-  const loadRecords = useCallback(async () => { // 非同期関数を定義
-    setLoading(true); // ローディング
-    try {
-      const { error, data } = await fetchRecord();
-      if (error) {
-        reset()
-        onClose();
-        toast({
-          title: "エラーが起こりました",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-        });
-        return;
-      }
-    setRecords(
-      data ? data.map(d => // data が null じゃなかったら map してセット。null だったら空の配列をセット
-      StudyRecord.newRecord(d.id, d.title, d.time, d.created_at) //4つの引数（id, title, time, created_at）が必要
-    ): []);
-      } catch (err) {
-      if (err) {
-        reset()
-        onClose();
-        toast({
-          title: "エラーが起こりました",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-        });
-        return;
-      }
-      } finally {
-        setLoading(false); 
-      }
-  }, [onClose, reset, toast]);
+const onSubmit = async (data: FormValues) => {
+if (editingRecord) {
+  await updateRecord(editingRecord.id, data);
+  loadRecords();
+  console.log("更新完了")
+  onClose();
+  toast({
+    title: "保存しました",
+    status: "success",
+    duration: 3000,
+    isClosable: true,
+    position: "top",
+  });
+  // 成功時：reset(), onClose(), toast など
+} else {
+  await handleAdd(data); // 新規登録時はそのまま使う
+}
+};
 
-  const handleAdd = async (data: FormValues) => {
-    console.log("送信されたフォームの値:", data);
-    //errorの処理
-    setLoading(true);
-    //newRecord(型)をオブジェクトとして定義
-    const newRecord: NewRecord = {
-      title: data.text,
-      time: Number(data.time),
-      created_at: new Date(data.created_at).toISOString(),
-    };
-    console.log("送信データ", newRecord);
-    //supabaseの処理
-    try {
-    const { error } = await insertRecord(newRecord);
-      if (error) {
-        reset()
-        onClose();
-        toast({
-          title: "supabaseでエラーが起こりました",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-        });
-        return;
-      }
-
-    await loadRecords();
+const loadRecords = useCallback(async () => { //一覧をデータベースの最新に合わせて更新する
+  setLoading(true); // ローディング
+  try {
+    const { error, data } = await fetchRecord();
+    if (error) {
       reset()
       onClose();
       toast({
-        title: "追加しました",
-        status: "success",
+        title: "エラーが起こりました",
+        status: "error",
         duration: 3000,
         isClosable: true,
         position: "top",
       });
       return;
     }
-    catch (error) {
-      if (error) {
-        reset()
-        onClose();
-        toast({
-          title: "supabaseでエラーが起こりました",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-        });
-      return;
-    }}
-    finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (record: StudyRecord) => {
-    const { error } = await deleteRecord(record.id);
-      if (error) {
-        reset()
-        onClose();
-        toast({
-          title: "supabaseでエラーが起こりました",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-        });
+  setRecords(
+    data ? data.map(d => // data が null じゃなかったら map してセット。null だったら空の配列をセット
+    StudyRecord.newRecord(d.id, d.title, d.time, d.created_at) //4つの引数（id, title, time, created_at）が必要
+  ): []);
+    } catch (err) {
+    if (err) {
+      reset()
+      onClose();
+      toast({
+        title: "エラーが起こりました",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
       return;
     }
-    await loadRecords();
+    } finally {
+      setLoading(false); 
+    }
+}, [onClose, reset, toast]);
+
+const handleAdd = async (data: FormValues) => {
+  console.log("送信されたフォームの値:", data);
+  //errorの処理
+  setLoading(true);
+  //newRecord(型)をオブジェクトとして定義
+  const newRecord: NewRecord = {
+    title: data.text,
+    time: Number(data.time),
+    created_at: new Date(data.created_at).toISOString(),
   };
+  console.log("送信データ", newRecord);
+  //supabaseの処理
+  try {
+  const { error } = await insertRecord(newRecord);
+    if (error) {
+      reset()
+      onClose();
+      toast({
+        title: "supabaseでエラーが起こりました",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+      return;
+    }
 
-  useEffect(() => {
-    loadRecords();
-  }, [loadRecords]); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
-
-  useEffect(() => { //編集ボタン押下後、フォームに初期値をセットする
-  if (editingRecord) {
-    reset({
-      created_at: editingRecord.created_at,
-      text: editingRecord.title,
-      time: editingRecord.time,
+  await loadRecords();
+    reset()
+    onClose();
+    toast({
+      title: "追加しました",
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+      position: "top",
     });
+    return;
   }
+  catch (error) {
+    if (error) {
+      reset()
+      onClose();
+      toast({
+        title: "supabaseでエラーが起こりました",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+    return;
+  }}
+  finally {
+    setLoading(false);
+  }
+};
+
+const handleDelete = async (record: StudyRecord) => {
+  const { error } = await deleteRecord(record.id);
+    if (error) {
+      reset()
+      onClose();
+      toast({
+        title: "supabaseでエラーが起こりました",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+    return;
+  }
+  await loadRecords();
+};
+
+useEffect(() => {
+  loadRecords();
+}, [loadRecords]); // 空の第二引数を渡して「何も依存しない」＝「初回だけ動く」ようにする
+
+useEffect(() => { //編集ボタン押下後、フォームに初期値をセットする
+if (editingRecord) {
+  reset({
+    created_at: formatDateForInput(editingRecord.created_at),
+    text: editingRecord.title,
+    time: editingRecord.time,
+  });
+}
 }, [editingRecord, reset]);
 
-  if (loading) {
-    return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p data-testid="loading">Loading...</p></Box>;
-  }
+if (loading) {
+  return <Box alignItems="center" h="100vh" display="flex" justifyContent="center"><p data-testid="loading">Loading...</p></Box>;
+}
 
 
   return (
@@ -179,7 +199,7 @@ const App = () => {
     <Modal isOpen={isOpen} onClose={handleClose}>
     <ModalOverlay />
     <ModalContent>
-      <ModalHeader data-testid="modal_title">新規登録</ModalHeader>
+      <ModalHeader data-testid="modal_title">{getModalTitle()}</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
         <Box gap={4} justifyContent="center" p="4">
@@ -187,6 +207,7 @@ const App = () => {
           <form onSubmit={handleSubmit(onSubmit)}>
             日時
             <Input my="2" bg='white'
+              data-testid="datetime_input"
               type="datetime-local"
               {...register("created_at", { required: "日時の入力は必須です" })}
             />
